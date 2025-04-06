@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://rh-management:npg_WoP23JfHuhvR@ep-autumn-art-a2sc4a3q.eu-central-1.pg.koyeb.app/koyebdb?sslmode=require
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=your-secret-key
+    depends_on:
+      - backend
+      - db
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    depends_on:
+      - db
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=postgresql://rh-management:npg_WoP23JfHuhvR@ep-autumn-art-a2sc4a3q.eu-central-1.pg.koyeb.app/koyebdb?sslmode=require
+    command: sh -c "npx prisma migrate deploy && npm run dev"
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  db:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=rh-management
+      - POSTGRES_HOST=ep-autumn-art-a2sc4a3q.eu-central-1.pg.koyeb.app
+      - POSTGRES_PASSWORD=npg_WoP23JfHuhvR
+      - POSTGRES_DB=koyebdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

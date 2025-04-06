@@ -1,0 +1,26 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache openssl python3 make g++
+
+COPY package*.json ./
+COPY prisma/schema.prisma ./prisma/
+
+RUN npm install
+
+
+COPY . .
+
+
+RUN npx prisma migrate dev --name init
+RUN npx prisma generate
+
+EXPOSE 4000
+
+COPY migrate.sh /app/migrate.sh
+RUN chmod +x /app/migrate.sh
+ENTRYPOINT ["/app/migrate.sh"]
+
+
+CMD ["npm", "run", "dev"]

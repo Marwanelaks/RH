@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  name      String?
+  email     String    @unique
+  password  String
+  role      Role      @default(EMPLOYEE)
+  posts     Post[]
+  employee  Employee?
+  manager   Manager?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// Remove Userx model completely - merge its fields into User if needed
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("posts")
+}
+
+model Employee {
+  id           String        @id @default(cuid())
+  userId       String        @unique
+  user         User          @relation(fields: [userId], references: [id])
+  position     String
+  department   String
+  startDate    DateTime
+  salary       Float
+  managerId    String?
+  manager      Manager?      @relation(fields: [managerId], references: [id])
+  contracts    Contract[]
+  leaves       Leave[]
+  performances Performance[]
+  trainings    Training[]
+}
+
+model Manager {
+  id         String     @id @default(cuid())
+  userId     String     @unique
+  user       User       @relation(fields: [userId], references: [id])
+  department String
+  employees  Employee[]
+}
+
+model Contract {
+  id         String         @id @default(cuid())
+  type       ContractType
+  startDate  DateTime
+  endDate    DateTime?
+  status     ContractStatus @default(ACTIVE)
+  employeeId String
+  employee   Employee       @relation(fields: [employeeId], references: [id])
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
+
+model Leave {
+  id         String      @id @default(cuid())
+  type       LeaveType
+  startDate  DateTime
+  endDate    DateTime
+  status     LeaveStatus @default(PENDING)
+  employeeId String
+  employee   Employee    @relation(fields: [employeeId], references: [id])
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Performance {
+  id         String   @id @default(cuid())
+  rating     Int
+  feedback   String
+  reviewDate DateTime
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Training {
+  id             String         @id @default(cuid())
+  title          String
+  description    String
+  status         TrainingStatus @default(IN_PROGRESS)
+  startDate      DateTime
+  completionDate DateTime?
+  employeeId     String
+  employee       Employee       @relation(fields: [employeeId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+enum Role {
+  ADMIN
+  HR
+  MANAGER
+  EMPLOYEE
+}
+
+enum ContractType {
+  CDI
+  CDD
+  INTERNSHIP
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum LeaveType {
+  VACATION
+  SICK
+  PERSONAL
+  MATERNITY
+  PATERNITY
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TrainingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
