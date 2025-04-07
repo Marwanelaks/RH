@@ -9,7 +9,7 @@ export async function GET() {
     await prisma.$connect();
     
     // Get count of users as a simple test
-    const userCount = await prisma.user.count();
+    const userCount = await prisma.employee.count();
     
     return NextResponse.json({
       status: 'success',

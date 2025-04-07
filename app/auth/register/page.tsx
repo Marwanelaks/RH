@@ -38,7 +38,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterForm) => {
     try {
       setError('');
-      const response = await fetch('http://localhost:3000/api/auth/register', {
+      const response = await fetch('/api/register', { // Removed hardcoded URL
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -47,26 +47,29 @@ export default function RegisterPage() {
           name: data.name,
           email: data.email,
           password: data.password,
-          role: 'EMPLOYEE', // Default role for new registrations
+          role: 'EMPLOYEE',
         }),
       });
-
-      const result = await response.json();
-
+  
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to create account');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Registration failed');
       }
-
-      // Show success toast
+  
       toast({
-        title: "Account created successfully!",
-        description: "You can now log in with your credentials.",
+        title: "Registration Successful!",
+        description: "Your account has been created.",
       });
-
-      // Redirect to login page
+  
       router.push('/auth/login');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create account. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Registration failed';
+      setError(errorMessage);
+      toast({
+        title: "Registration Error",
+        description: errorMessage,
+        variant: "destructive"
+      });
     }
   };
 

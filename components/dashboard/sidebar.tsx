@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Users,
   FileText,
@@ -13,7 +13,9 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
+import { useToast } from "../../hooks/use-toast";
 import { cn } from "@/lib/utils";
+
 
 const menuItems = [
   {
@@ -60,7 +62,29 @@ const menuItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { toast } = useToast();
 
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Logged out successfully",
+        });
+        router.push('/auth/login');
+      }
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        variant: "destructive",
+      });
+    }
+  };
   return (
     <div className="flex flex-col h-full bg-card border-r">
       <div className="p-6">
@@ -90,7 +114,7 @@ export function Sidebar() {
         </ul>
       </nav>
       <div className="p-4 border-t">
-        <button className="flex items-center space-x-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
+        <button onClick={handleLogout} className="flex items-center space-x-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
           <LogOut className="h-4 w-4" />
           <span>Déconnexion</span>
         </button>

@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { cookies } from 'next/headers';
 
-const prisma = new PrismaClient();
-
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const { email, password } = await req.json();
+    const { email, password } = await request.json();
+
+    // Validate input
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: 'Email and password are required' },
+        { status: 400 }
+      );
+    }
 
     // Find user
     const user = await prisma.user.findUnique({
@@ -22,8 +29,8 @@ export async function POST(req: Request) {
     }
 
     // Verify password
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
+    const passwordValid = await bcrypt.compare(password, user.password);
+    if (!passwordValid) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
@@ -32,22 +39,32 @@ export async function POST(req: Request) {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET || 'your-jwt-secret-here',
-      { expiresIn: '24h' }
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: '1d' }
     );
 
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
+    // Set HTTP-only cookie
+    cookies().set({
+      name: 'auth_token',
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 86400, // 1 day
+      path: '/',
+    });
 
+    // Return user data (without password)
+    const { password: _, ...userWithoutPassword } = user;
     return NextResponse.json({
       user: userWithoutPassword,
-      token,
     });
+
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { error: 'Failed to login' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

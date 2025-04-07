@@ -5,12 +5,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Users } from 'lucide-react';
+import { useToast } from "../../../hooks/use-toast";
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -21,6 +23,9 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const [error, setError] = useState<string>('');
+  const router = useRouter();
+  const { toast } = useToast();
+  
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
@@ -28,10 +33,37 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     try {
       setError('');
-      // TODO: Implement login logic with NextAuth
-      console.log('Login data:', data);
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Important for cookies
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to login');
+      }
+
+      // Show success toast
+      toast({
+        title: "Login successful!",
+        description: "You are now logged in.",
+      });
+
+      // Redirect to dashboard
+      router.push('/dashboard/hr');
+
     } catch (err) {
-      setError('Failed to login. Please check your credentials.');
+      setError(err instanceof Error ? err.message : 'Failed to login. Please try again.');
+      toast({
+        title: "Login failed",
+        description: err instanceof Error ? err.message : 'Invalid credentials',
+        variant: "destructive"
+      });
     }
   };
 
@@ -56,6 +88,7 @@ export default function LoginPage() {
                 type="email"
                 placeholder="name@example.com"
                 {...register('email')}
+                className={errors.email ? 'border-destructive' : ''}
               />
               {errors.email && (
                 <p className="text-sm text-destructive">{errors.email.message}</p>
@@ -67,6 +100,7 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 {...register('password')}
+                className={errors.password ? 'border-destructive' : ''}
               />
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
