@@ -39,7 +39,11 @@ export async function POST(request: Request) {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
+      {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      },
       process.env.JWT_SECRET!,
       { expiresIn: '1d' }
     );
@@ -51,14 +55,15 @@ export async function POST(request: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 86400, // 1 day
+      maxAge: 60 * 60 * 24, // 1 day
       path: '/',
     });
 
-    // Return user data (without password)
+    // Return user data (without password) and token
     const { password: _, ...userWithoutPassword } = user;
     return NextResponse.json({
       user: userWithoutPassword,
+      token, // Include token in response
     });
 
   } catch (error) {

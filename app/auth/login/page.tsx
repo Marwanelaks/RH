@@ -38,25 +38,36 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Important for cookies
+        credentials: 'include',
         body: JSON.stringify(data),
       });
-
+  
       const result = await response.json();
-
+  
       if (!response.ok) {
         throw new Error(result.error || 'Failed to login');
       }
-
+  
+      // Store token in localStorage
+      if (result.token) {
+        localStorage.setItem('token', result.token);
+      }
+  
       // Show success toast
       toast({
         title: "Login successful!",
         description: "You are now logged in.",
       });
-
-      // Redirect to dashboard
-      router.push('/dashboard/hr');
-
+  
+      // Redirect based on role
+      if (result.user.role === 'HR') {
+        router.push('/dashboard/hr');
+      } else if (result.user.role === 'ADMIN') {
+        router.push('/dashboard/admin');
+      } else {
+        router.push('/dashboard');
+      }
+  
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login. Please try again.');
       toast({

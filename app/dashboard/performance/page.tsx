@@ -1,6 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useRouter } from "next/navigation";
+import { useToast } from "../../../hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +14,156 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Search, Star, MessageSquare } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// Define validation schema
+const performanceSchema = z.object({
+  employeeId: z.string().min(1, "Employee is required"),
+  rating: z.number().min(1).max(5),
+  feedback: z.string().min(10, "Feedback must be at least 10 characters"),
+});
+
+type PerformanceForm = z.infer<typeof performanceSchema>;
+
 export default function PerformancePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [reviews, setReviews] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [stats, setStats] = useState({
+    averageRating: 0,
+    completedReviews: 0,
+    totalEmployees: 0,
+    improvement: 0
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<PerformanceForm>({
+    resolver: zodResolver(performanceSchema),
+    defaultValues: {
+      employeeId: "",
+      rating: 3,
+      feedback: ""
+    }
+  });
+
+  useEffect(() => {
+    fetchPerformanceData();
+    fetchEmployees();
+  }, []);
+
+  const fetchPerformanceData = async () => {
+    try {
+      const response = await fetch("/api/performance");
+      if (!response.ok) throw new Error("Failed to fetch performance data");
+      
+      const data = await response.json();
+      setReviews(data.performances);
+      
+      // Calculate stats
+      const employeeResponse = await fetch("/api/employees");
+      const employeeData = await employeeResponse.json();
+      const totalEmployees = employeeData.length;
+      const completedReviews = data.performances.length;
+      const improvement = calculateImprovement(data.performances);
+
+      setStats({
+        averageRating: data.stats.averageRating,
+        completedReviews,
+        totalEmployees,
+        improvement
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load performance data",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const response = await fetch("/api/employees");
+      if (!response.ok) throw new Error("Failed to fetch employees");
+      
+      const data = await response.json();
+      setEmployees(data);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load employees",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const calculateImprovement = (performances) => {
+    if (performances.length < 2) return 0;
+    
+    // Simple calculation - compare last 2 quarters
+    const lastQuarter = performances
+      .slice(0, Math.floor(performances.length / 2))
+      .reduce((sum, p) => sum + p.rating, 0) / Math.floor(performances.length / 2);
+      
+    const currentQuarter = performances
+      .slice(Math.floor(performances.length / 2))
+      .reduce((sum, p) => sum + p.rating, 0) / Math.floor(performances.length / 2);
+      
+    return ((currentQuarter - lastQuarter) / lastQuarter) * 100;
+  };
+
+  const onSubmit = async (data: PerformanceForm) => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/performance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create performance review");
+      }
+  
+      const newReview = await response.json();
+      setReviews([newReview, ...reviews]);
+      
+      // Update stats
+      const newAverage = (stats.averageRating * stats.completedReviews + newReview.rating) / 
+                         (stats.completedReviews + 1);
+      
+      setStats({
+        ...stats,
+        averageRating: newAverage,
+        completedReviews: stats.completedReviews + 1,
+        improvement: calculateImprovement([newReview, ...reviews])
+      });
+      
+      toast({
+        title: "Performance review submitted",
+        description: "The evaluation has been successfully recorded.",
+      });
+  
+      reset();
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error submitting review",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -28,46 +180,88 @@ export default function PerformancePage() {
             <DialogHeader>
               <DialogTitle>Créer une Nouvelle Évaluation</DialogTitle>
             </DialogHeader>
-            <form className="space-y-4 mt-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
               <div className="grid gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Employé</label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un employé" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">John Doe</SelectItem>
-                      <SelectItem value="2">Jane Smith</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Controller
+                    name="employeeId"
+                    control={control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un employé" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {employees.map((employee) => (
+                            <SelectItem key={employee.id} value={employee.id}>
+                              {employee.user.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.employeeId && (
+                    <p className="text-sm text-destructive">{errors.employeeId.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Note</label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Attribuer une note" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5].map((rating) => (
-                        <SelectItem key={rating} value={rating.toString()}>
-                          {rating} {rating === 1 ? 'étoile' : 'étoiles'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Controller
+                    name="rating"
+                    control={control}
+                    render={({ field }) => (
+                      <Select 
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                        value={field.value.toString()}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Attribuer une note" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5].map((rating) => (
+                            <SelectItem key={rating} value={rating.toString()}>
+                              {rating} {rating === 1 ? 'étoile' : 'étoiles'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.rating && (
+                    <p className="text-sm text-destructive">{errors.rating.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Feedback</label>
-                  <textarea
-                    className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    placeholder="Commentaires détaillés..."
+                  <Controller
+                    name="feedback"
+                    control={control}
+                    render={({ field }) => (
+                      <textarea
+                        className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="Commentaires détaillés..."
+                        {...field}
+                      />
+                    )}
                   />
+                  {errors.feedback && (
+                    <p className="text-sm text-destructive">{errors.feedback.message}</p>
+                  )}
                 </div>
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline">Annuler</Button>
-                <Button>Soumettre</Button>
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => reset()}
+                >
+                  Annuler
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "En cours..." : "Soumettre"}
+                </Button>
               </div>
             </form>
           </DialogContent>
@@ -81,8 +275,12 @@ export default function PerformancePage() {
             <Star className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">4.2/5</div>
-            <p className="text-xs text-muted-foreground">+0.3 depuis la dernière période</p>
+            <div className="text-2xl font-bold">
+              {stats.averageRating.toFixed(1)}/5
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats.improvement > 0 ? '+' : ''}{stats.improvement.toFixed(1)}% depuis la dernière période
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -91,8 +289,10 @@ export default function PerformancePage() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
-            <p className="text-xs text-muted-foreground">Sur 180 employés</p>
+            <div className="text-2xl font-bold">{stats.completedReviews}</div>
+            <p className="text-xs text-muted-foreground">
+              Sur {stats.totalEmployees} employés
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -101,7 +301,9 @@ export default function PerformancePage() {
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+15%</div>
+            <div className="text-2xl font-bold">
+              {stats.improvement > 0 ? '+' : ''}{stats.improvement.toFixed(1)}%
+            </div>
             <p className="text-xs text-muted-foreground">Amélioration globale</p>
           </CardContent>
         </Card>
@@ -129,24 +331,31 @@ export default function PerformancePage() {
                 <TableHead>Employé</TableHead>
                 <TableHead>Note</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Évaluateur</TableHead>
                 <TableHead>Commentaires</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reviews.map((review) => (
+              {reviews
+                .filter(review => 
+                  review.employee.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  review.feedback.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((review) => (
                 <TableRow key={review.id}>
-                  <TableCell className="font-medium">{review.employeeName}</TableCell>
+                  <TableCell className="font-medium">{review.employee.user.name}</TableCell>
                   <TableCell>
                     <div className="flex items-center">
                       {review.rating}
                       <Star className="h-4 w-4 text-yellow-500 ml-1" />
                     </div>
                   </TableCell>
-                  <TableCell>{new Date(review.date).toLocaleDateString()}</TableCell>
-                  <TableCell>{review.evaluator}</TableCell>
-                  <TableCell className="max-w-xs truncate">{review.feedback}</TableCell>
+                  <TableCell>
+                    {new Date(review.reviewDate).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate">
+                    {review.feedback}
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm">
                       <MessageSquare className="h-4 w-4" />

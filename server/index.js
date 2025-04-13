@@ -45,7 +45,7 @@ app.post('/api/auth/register', async (req, res) => {
         name,
         email,
         password: hashedPassword,
-        role: role || 'EMPLOYEE',
+        role: role || 'HR',
       },
     });
 
@@ -113,50 +113,50 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Employee routes
-app.get('/api/employees', authenticateToken, async (req, res) => {
-  try {
-    const employees = await prisma.employee.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-        manager: true,
-      },
-    });
-    res.json(employees);
-  } catch (error) {
-    console.error('Error fetching employees:', error);
-    res.status(500).json({ error: 'Failed to fetch employees' });
-  }
-});
+// app.get('/api/employees', authenticateToken, async (req, res) => {
+//   try {
+//     const employees = await prisma.employee.findMany({
+//       include: {
+//         user: {
+//           select: {
+//             id: true,
+//             name: true,
+//             email: true,
+//             role: true,
+//           },
+//         },
+//         manager: true,
+//       },
+//     });
+//     res.json(employees);
+//   } catch (error) {
+//     console.error('Error fetching employees:', error);
+//     res.status(500).json({ error: 'Failed to fetch employees' });
+//   }
+// });
 
-app.post('/api/employees', authenticateToken, async (req, res) => {
-  try {
-    const employee = await prisma.employee.create({
-      data: req.body,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-        manager: true,
-      },
-    });
-    res.json(employee);
-  } catch (error) {
-    console.error('Error creating employee:', error);
-    res.status(500).json({ error: 'Failed to create employee' });
-  }
-});
+// app.post('/api/employees', authenticateToken, async (req, res) => {
+//   try {
+//     const employee = await prisma.employee.create({
+//       data: req.body,
+//       include: {
+//         user: {
+//           select: {
+//             id: true,
+//             name: true,
+//             email: true,
+//             role: true,
+//           },
+//         },
+//         manager: true,
+//       },
+//     });
+//     res.json(employee);
+//   } catch (error) {
+//     console.error('Error creating employee:', error);
+//     res.status(500).json({ error: 'Failed to create employee' });
+//   }
+// });
 
 // Start the server
 const PORT = 4000;

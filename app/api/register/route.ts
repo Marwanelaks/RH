@@ -29,7 +29,7 @@ export async function POST(req: Request) {
         name,
         email,
         password: hashedPassword,
-        role: role || 'EMPLOYEE',
+        role: role || 'HR',
       },
     });
 

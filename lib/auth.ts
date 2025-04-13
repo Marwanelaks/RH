@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { serialize } from 'cookie';
 import { TokenPayload } from '../types';
 import { NextApiResponse } from 'next';
+import { cookies } from 'next/headers';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN as string;
@@ -46,9 +47,13 @@ export function clearTokenCookie(res: NextApiResponse): void {
   res.setHeader('Set-Cookie', cookie);
 }
 
-export function verifyToken(token: string): TokenPayload | null {
+export function verifyToken(token: string) {
   try {
-    return jwt.verify(token, JWT_SECRET) as TokenPayload;
+    return jwt.verify(token, process.env.JWT_SECRET!) as {
+      userId: string;
+      email: string;
+      role: string;
+    };
   } catch (error) {
     return null;
   }
@@ -56,4 +61,53 @@ export function verifyToken(token: string): TokenPayload | null {
 
 export function getTokenFromRequest(req: { cookies: { [key: string]: string } }): string | null {
   return req.cookies.auth_token || null;
+}
+
+
+export function getToken() {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('token');
+  }
+  return null;
+}
+
+
+export function getCurrentUser() {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET!) as {
+      userId: string;
+      email: string;
+      role: string;
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export function isAuthenticated() {
+  return !!getCurrentUser();
+}
+
+export function isAdmin() {
+  const user = getCurrentUser();
+  return user?.role === 'ADMIN';
+}
+
+export function isHR() {
+  const user = getCurrentUser();
+  return user?.role === 'HR';
+}
+
+export async function verifyAuth(token: string) {
+  try {
+    debugger
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-jwt-secret-here');
+    debugger
+    return decoded;
+  } catch (error) {
+    throw new Error('Invalid token');
+  }
 }

@@ -50,6 +50,7 @@ model Employee {
   leaves       Leave[]
   performances Performance[]
   trainings    Training[]
+  payroll      Payroll[]
 }
 
 model Manager {
@@ -79,6 +80,7 @@ model Leave {
   endDate    DateTime
   status     LeaveStatus @default(PENDING)
   employeeId String
+  comment String  
   employee   Employee    @relation(fields: [employeeId], references: [id])
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -106,6 +108,19 @@ model Training {
   employee       Employee       @relation(fields: [employeeId], references: [id])
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+}
+
+model Payroll {
+  id          String   @id @default(uuid())
+  amount      Float
+  type        String
+  paymentDate DateTime
+  status      String   @default("PAID")
+  notes       String?
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  employeeId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum Role {
